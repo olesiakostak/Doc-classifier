@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Upload document</title>
+</head>
+<body>
+    <h1>Upload document</h1>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="file">Choose a PDF:</label>
+        <input id="file" type="file" name="file" accept="application/pdf" required>
+        <button type="submit">Upload</button>
+    </form>
+
+    {% if errors %}
+        <ul>
+            {% for field, messages in errors.items %}
+                {% for message in messages %}
+                    <li>{{ field }}: {{ message }}</li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+    {% endif %}
+</body>
+</html>

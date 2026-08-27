@@ -17,7 +17,10 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
+from documents.views import UploadDocumentView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("documents/upload/", UploadDocumentView.as_view(), name="document-upload"),
 ]
+
