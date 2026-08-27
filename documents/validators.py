@@ -22,10 +22,6 @@ class CorruptedPDFError(InvalidPDFError):
 
 
 def validate_pdf_document(pdf: UploadedFile):
-    """
-    Validates that the uploaded file is within size limits and is a
-    readable PDF. Returns the number of pages on success.
-    """
     size_of_file_mb = float(pdf.size) / 1048576 
 
     if size_of_file_mb > MAX_PDF_SIZE_MB:
@@ -33,7 +29,7 @@ def validate_pdf_document(pdf: UploadedFile):
 
     pdf.seek(0)
     try:
-        reader = PdfReader(pdf.read())
+        reader = PdfReader(pdf)
     except PdfReadError:
         raise CorruptedPDFError(f"Failed openning file")   
 

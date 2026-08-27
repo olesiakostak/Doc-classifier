@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import DocumentUploadSerializer
 from .validators import validate_pdf_document, InvalidPDFError
+from classification.extractors import extract_text
 
 
 class UploadDocumentView(APIView):
@@ -23,9 +24,11 @@ class UploadDocumentView(APIView):
                     "message": str(e)},
                     status=status.HTTP_400_BAD_REQUEST)
 
+            text = extract_text(pdf_file)
+
             return Response({
                 "filename": pdf_file.name,
-                "message": "File uploaded successfully"
+                "message": text
             })
 
         return Response(
