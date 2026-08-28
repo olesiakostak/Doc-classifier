@@ -1,14 +1,20 @@
-from django.core.files.uploadedfile import UploadedFile
-from pypdf import PdfReader
-from pypdf.errors import PdfReadError
 import fitz
+import base64
+import re
 from groq import Groq
 from django.conf import settings
-import base64
+from django.core.files.uploadedfile import UploadedFile
+from classification.exceptions import TextExtractionError
+from groq import APIConnectionError, RateLimitError, APIStatusError, APIError
+
 
 GROQ_API_KEY = settings.GROQ_API_KEY
 GROQ_VISION_MODEL = "qwen/qwen3.6-27b"
-MAX_IMAGES = 3
+MAX_IMAGES = 1
+
+
+def strip_thinking_block(text: str) -> str:
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
 
 def is_scanned_pdf(pdf: fitz.Document, min_total_chars: int = 5):
@@ -27,21 +33,11 @@ def is_scanned_pdf(pdf: fitz.Document, min_total_chars: int = 5):
 
 
 def extract_text_from_scanned_pdf(pdf: fitz.Document) -> str:
-    print("Start llm")
     num_pages = min(pdf.page_count, MAX_IMAGES)
 
-    client = Groq(api_key=settings.GROQ_API_KEY)
+    client = Groq(api_key=GROQ_API_KEY)
 
-    content = [
-        {
-            "type": "text",
-            "text": (
-                "Extract all readable text from these document pages, "
-                "in reading order. Return only the extracted text, "
-                "no comments or explanations."
-            ),
-        }
-    ]
+    content = []
 
     for page_num in range(num_pages):
         page = pdf.load_page(page_num)
@@ -53,16 +49,36 @@ def extract_text_from_scanned_pdf(pdf: fitz.Document) -> str:
             "image_url": {"url": f"data:image/png;base64,{img_base64}"},
         })
 
-    response = client.chat.completions.create(
-        model=GROQ_VISION_MODEL,
-        messages=[{"role": "user", "content": content}],
-    )
+    system_prompt = {
+            "role": "system",
+            "content": (
+                "Extract all readable text from the provided document pages, "
+                "in reading order. Return only the extracted text, "
+                "no comments or explanations."
+        ),
+    }
 
-    return response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(
+            model=GROQ_VISION_MODEL,
+            messages=[
+                system_prompt,
+                {"role": "user", "content": content},
+            ],
+        )
+    except APIConnectionError as e:
+        raise TextExtractionError(f"Could not reach Groq API: {e}")
+    except RateLimitError as e:
+        raise TextExtractionError(f"Groq API rate limit exceeded: {e}")
+    except APIStatusError as e:
+        raise TextExtractionError(f"Groq API returned an error status: {e}")
+    except APIError as e:
+        raise TextExtractionError(f"Groq API error: {e}")
+    
+    return strip_thinking_block(response.choices[0].message.content)
 
 
 def extract_text(pdf: UploadedFile) -> str:
-    print("STart extractopm")
     pdf.seek(0)
     pdf = fitz.open(stream=pdf.read(), filetype="pdf")
 
@@ -75,3 +91,5 @@ def extract_text(pdf: UploadedFile) -> str:
         text_from_pages.append(page.get_text())
 
     return "\n".join(text_from_pages)
+
+
