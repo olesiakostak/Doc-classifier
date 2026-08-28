@@ -1,6 +1,6 @@
 DOC_TYPES = ["Invoice", "BOL", "POD", "Rate Confirmation", "Packing List", "Other"]
 
-INVOICE_FIELDS = ["invoice_number", "invoice_date", "total_amount", "vendor_name"]
+INVOICE_FIELDS = ["invoice_number", "invoice_date", "total_amount", "vendor_name", "bill_to"]
 BOL_FIELDS = ["bol_number", "shipper", "consignee", "carrier", "pickup_date"]
 POD_FIELDS = ["delivery_date", "receiver_signature_present", "delivery_address"]
 
