@@ -1,7 +1,7 @@
 from groq import Groq
 from groq import APIConnectionError, RateLimitError, APIStatusError, APIError
 from django.conf import settings
-from classification.exceptions import ClassificationError
+from classification.exceptions import ClassificationError, FieldExtractionNotSupportedError
 from classification.schemas import extraction_field_schema, FIELD_NAMES_BY_TYPE
 import json
 
@@ -11,6 +11,11 @@ GROQ_TEXT_MODEL = "openai/gpt-oss-120b"
 
 
 def doc_fields_extraction(doc_type: str, text: str) -> dict:
+    if doc_type not in FIELD_NAMES_BY_TYPE:
+        raise FieldExtractionNotSupportedError(
+            f"Field extraction is not yet supported for document type '{doc_type}'."
+        )
+    
     client = Groq(api_key=GROQ_API_KEY)
 
     field_names = FIELD_NAMES_BY_TYPE[doc_type]

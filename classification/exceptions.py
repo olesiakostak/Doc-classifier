@@ -11,3 +11,9 @@ class TextExtractionError(LLMServiceError):
 class ClassificationError(LLMServiceError):
     """Raised when document classification fails for any reason."""
     pass
+
+class FieldExtractionNotSupportedError(LLMServiceError):
+    """
+    Raised when field extraction is requested for a document type
+    that has no defined field schema (e.g. "Other")."""
+    pass
