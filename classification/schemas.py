@@ -4,6 +4,11 @@ INVOICE_FIELDS = ["invoice_number", "invoice_date", "total_amount", "vendor_name
 BOL_FIELDS = ["bol_number", "shipper", "consignee", "carrier", "pickup_date"]
 POD_FIELDS = ["delivery_date", "receiver_signature_present", "delivery_address"]
 
+FIELD_NAMES_BY_TYPE = {
+    "Invoice": INVOICE_FIELDS,
+    "BOL": BOL_FIELDS,
+    "POD": POD_FIELDS,
+}
 
 document_classification_schema = {
     "type": "json_schema",
@@ -55,7 +60,7 @@ def build_field_extraction_schema(name: str, field_names: list[str]) -> dict:
     }
 
 
-FIELD_SCHEMAS = {
+extraction_field_schema = {
     "Invoice": build_field_extraction_schema("invoice_field_extraction", INVOICE_FIELDS),
     "BOL": build_field_extraction_schema("bol_field_extraction", BOL_FIELDS),
     "POD": build_field_extraction_schema("pod_field_extraction", POD_FIELDS),
