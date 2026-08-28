@@ -6,6 +6,7 @@ from .serializers import DocumentUploadSerializer
 from .validators import validate_pdf_document, InvalidPDFError
 from classification.extractors import extract_text
 from classification.classify import classify_text
+from classification.exceptions import ClassificationError, TextExtractionError
 
 
 class UploadDocumentView(APIView):
@@ -25,8 +26,14 @@ class UploadDocumentView(APIView):
                     "message": str(e)},
                     status=status.HTTP_400_BAD_REQUEST)
 
-            text = extract_text(pdf_file)
-            classified_text = classify_text(text)
+            try:
+                text = extract_text(pdf_file)
+                classified_text = classify_text(text)
+            except (TextExtractionError, ClassificationError) as e:
+                return Response(
+                    {"message": str(e)},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
 
             return Response({
                 "filename": pdf_file.name,

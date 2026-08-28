@@ -10,7 +10,7 @@ from groq import APIConnectionError, RateLimitError, APIStatusError, APIError
 
 GROQ_API_KEY = settings.GROQ_API_KEY
 GROQ_VISION_MODEL = "qwen/qwen3.6-27b"
-MAX_IMAGES = 1
+MAX_IMAGES = settings.MAX_OCR_PAGES
 
 
 def strip_thinking_block(text: str) -> str:
@@ -80,16 +80,18 @@ def extract_text_from_scanned_pdf(pdf: fitz.Document) -> str:
 
 def extract_text(pdf: UploadedFile) -> str:
     pdf.seek(0)
-    pdf = fitz.open(stream=pdf.read(), filetype="pdf")
+    try:
+        with fitz.open(stream=pdf.read(), filetype="pdf") as document:
+            if is_scanned_pdf(document):
+                return extract_text_from_scanned_pdf(document)
 
-    if is_scanned_pdf(pdf):
-        return extract_text_from_scanned_pdf(pdf)
+            text_from_pages = []
+            for page_num in range(document.page_count):
+                page = document.load_page(page_num)
+                text_from_pages.append(page.get_text())
 
-    text_from_pages = []
-    for page_num in range(pdf.page_count):
-        page = pdf.load_page(page_num)
-        text_from_pages.append(page.get_text())
-
-    return "\n".join(text_from_pages)
+            return "\n".join(text_from_pages)
+    except (fitz.FileDataError, ValueError) as exc:
+        raise TextExtractionError("Could not read PDF contents") from exc
 
 

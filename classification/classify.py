@@ -3,6 +3,7 @@ from groq import APIConnectionError, RateLimitError, APIStatusError, APIError
 from django.conf import settings
 from classification.exceptions import ClassificationError
 import json
+import math
 
 GROQ_API_KEY = settings.GROQ_API_KEY
 GROQ_TEXT_MODEL = "openai/gpt-oss-120b"
@@ -73,8 +74,16 @@ def classify_text(text: str) -> dict:
     try:
         doc_type = result["doc_type"]
         confidence = result["confidence"]
-    except KeyError as e:
-        raise ClassificationError(f"Model response missing expected field: {e}")
+    except (KeyError, TypeError) as e:
+        raise ClassificationError(f"Model response missing expected field: {e}") from e
+
+    allowed_doc_types = {"Invoice", "BOL", "POD", "Rate Confirmation", "Packing List", "Other"}
+    if doc_type not in allowed_doc_types:
+        raise ClassificationError("Model response contains an invalid document type")
+    if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
+        raise ClassificationError("Model response contains an invalid confidence score")
+    if not math.isfinite(confidence) or not 0 <= confidence <= 1:
+        raise ClassificationError("Confidence score must be between 0 and 1")
 
 
     return {
