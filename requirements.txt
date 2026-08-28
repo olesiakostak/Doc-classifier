@@ -4,3 +4,5 @@ djangorestframework==3.16.1
 PyMuPDF==1.26.4
 python-dotenv==1.1.1
 groq==0.31.0
+gunicorn==23.0.0
+whitenoise==6.9.0

@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: doc-classifier
+    runtime: python
+    buildCommand: pip install -r requirements.txt && bash build.sh
+    startCommand: gunicorn core.wsgi:application
+    healthCheckPath: /documents/upload/
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: GROQ_API_KEY
+        sync: false
