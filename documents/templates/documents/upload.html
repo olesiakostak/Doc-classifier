@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DocuFlow | Process a document</title>
+    <style>
+        :root { --ink: #17211b; --muted: #65736a; --line: #dce5de; --paper: #fbfcfa; --mint: #dff3e7; --green: #22734b; --orange: #e48b35; }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; color: var(--ink); background: radial-gradient(circle at 15% 0%, #e7f6ec, transparent 35%), var(--paper); font: 16px/1.5 Georgia, serif; }
+        main { width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 64px 0; }
+        .eyebrow { margin: 0 0 10px; color: var(--green); font: 700 12px/1.2 Arial, sans-serif; letter-spacing: 1.5px; text-transform: uppercase; }
+        h1 { max-width: 620px; margin: 0; font-size: clamp(2.5rem, 7vw, 5rem); line-height: .98; font-weight: 400; }
+        .intro { max-width: 570px; margin: 22px 0 38px; color: var(--muted); font-size: 1.12rem; }
+        .panel { padding: 28px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.8); box-shadow: 0 18px 45px rgba(33, 72, 47, .08); }
+        .dropzone { display: block; padding: 28px; border: 1px dashed #9ab9a3; border-radius: 7px; background: var(--mint); cursor: pointer; }
+        .dropzone strong { display: block; margin-bottom: 5px; font-size: 1.2rem; }
+        .dropzone span { color: var(--muted); }
+        input[type=file] { width: 100%; margin-top: 14px; font-family: Arial, sans-serif; }
+        .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+        button { padding: 12px 18px; border: 0; border-radius: 5px; color: white; background: var(--green); font: 700 14px Arial, sans-serif; cursor: pointer; }
+        button.secondary { color: var(--ink); background: #f5c98b; }
+        button:disabled { cursor: wait; opacity: .55; }
+        [hidden] { display: none !important; }
+        .status { min-height: 28px; margin: 22px 0 0; color: var(--muted); font-family: Arial, sans-serif; }
+        .result { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+        .result h2 { margin: 0 0 10px; font-size: 1.35rem; font-weight: 400; }
+        pre { margin: 0; padding: 14px; overflow-x: auto; border-radius: 5px; background: #f1f5f1; font: 14px/1.45 Consolas, monospace; }
+        @media (max-width: 600px) { main { padding: 36px 0; } .panel { padding: 18px; } .dropzone { padding: 20px; } }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Document Classification</h1>
+    <p class="intro">Choose a document, classify it, and extract structured fields when that document type is supported.</p>
+
+    <section class="panel">
+    <form id="document-form" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label class="dropzone" for="file">
+            <strong>Choose a PDF to begin</strong>
+            <span>The file stays in your browser until you classify it.</span>
+            <input id="file" type="file" name="file" accept="application/pdf" required>
+        </label>
+        <div class="actions">
+            <button id="upload" type="submit">Upload file</button>
+            <button id="classify" class="secondary" type="button" hidden>Classify document</button>
+            <button id="extract-fields" type="button" hidden>Extract fields</button>
+        </div>
+    </form>
+
+    <p id="message" class="status" role="status"></p>
+    <div id="classification-result" class="result" hidden>
+        <h2>Classification</h2>
+        <pre id="classification"></pre>
+        <p id="available-fields" class="status"></p>
+    </div>
+    <div id="fields-result" class="result" hidden>
+        <h2>Extracted fields</h2>
+        <pre id="fields"></pre>
+    </div>
+    </section>
+</main>
+
+    <script>
+        const form = document.querySelector("#document-form");
+        const fileInput = document.querySelector("#file");
+        const uploadButton = document.querySelector("#upload");
+        const message = document.querySelector("#message");
+        const classifyButton = document.querySelector("#classify");
+        const fieldsButton = document.querySelector("#extract-fields");
+        const availableFields = document.querySelector("#available-fields");
+        let classifiedType;
+
+        async function post(url, body) {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: {"X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value},
+                body,
+            });
+            const contentType = response.headers.get("content-type") || "";
+            const data = contentType.includes("application/json")
+                ? await response.json()
+                : {message: `Server returned HTTP ${response.status} instead of JSON`};
+            if (!response.ok) throw new Error(data.message || "Request failed");
+            return data;
+        }
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (!fileInput.files.length) return;
+            message.textContent = `Ready: ${fileInput.files[0].name}. Click classify when you are ready.`;
+            uploadButton.hidden = true;
+            classifyButton.hidden = false;
+        });
+
+        classifyButton.addEventListener("click", async () => {
+            try {
+                classifyButton.disabled = true;
+                const data = await post("{% url 'document-classify' %}", new FormData(form));
+                classifiedType = data.classification.doc_type;
+                document.querySelector("#classification").textContent = JSON.stringify(data.classification, null, 2);
+                availableFields.textContent = `Field extraction is available for: ${data.available_field_types.join(", ")}.`;
+                fieldsButton.hidden = !data.field_extraction_supported;
+                document.querySelector("#classification-result").hidden = false;
+            } catch (error) {
+                message.textContent = error.message;
+            } finally {
+                classifyButton.disabled = false;
+            }
+        });
+
+        fieldsButton.addEventListener("click", async () => {
+            try {
+                const body = new FormData(form);
+                body.append("doc_type", classifiedType);
+                const data = await post("{% url 'document-extract-fields' %}", body);
+                document.querySelector("#fields").textContent = JSON.stringify(data.fields, null, 2);
+                document.querySelector("#fields-result").hidden = false;
+            } catch (error) {
+                message.textContent = error.message;
+            }
+        });
+    </script>
+</body>
+</html>
